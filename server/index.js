@@ -12,8 +12,16 @@ const db = require('./db');
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors({ origin: 'https://ggdashboard.ngrok.app', credentials: true }));
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    `https://${process.env.SHOPIFY_APP_URL}`
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
+
 
 // 🔐 AUTH ROUTES
 app.get('/auth', (req, res) => {
@@ -119,9 +127,6 @@ app.post('/webhook/:resource/:event', express.raw({ type: 'application/json' }),
 });
 
 
-app.use(express.json());
-app.use(cors({ origin: 'https://ggdashboard.ngrok.app', credentials: true }));
-
 
 app.get('/', (req, res) => {
   res.send('✅ Backend running');
@@ -150,16 +155,13 @@ console.log('🔐 Using Secret:', process.env.SHOPIFY_API_SECRET?.slice(0, 6));
     console.log(`✅ OAuth success for ${shop}`);
     try {
   await db.query(
-  `INSERT INTO customers
-     (shopify_id, email, tag, name, created_at)
-   VALUES
-     ($1, $2, $3, $4, NOW())
-   ON CONFLICT (shopify_id) DO UPDATE
-     SET email = EXCLUDED.email,
-         tag   = EXCLUDED.tag,
-         name  = EXCLUDED.name`,
-  [customerId, email, creatorName, firstName]
+  `INSERT INTO shop_tokens (shop, access_token)
+   VALUES ($1, $2)
+   ON CONFLICT (shop) DO UPDATE SET access_token = EXCLUDED.access_token`,
+  [shop, accessToken]
 );
+
+
 
   console.log(`✅ Stored token in DB for shop: ${shop}`);
 } catch (dbErr) {
@@ -333,7 +335,8 @@ res.json({ message: '✅ Account created, tagged, and stored!' });
 
 
 async function registerWebhooksForShop(shop, accessToken) {
-  const webhookBaseUrl = 'https://ggdashboard.ngrok.app';
+  const webhookBaseUrl = `https://${process.env.SHOPIFY_APP_URL}`;
+
 }
 
 
@@ -681,15 +684,6 @@ app.get('/api/customer', async (req, res) => {
   }
 });
 
-
-app.use(
-  /^\/(?!api).*$/,
-  createProxyMiddleware({
-    target: 'http://localhost:5173',
-    changeOrigin: true,
-    ws: true,
-  })
-);
 
 
 app.listen(port, () => {
